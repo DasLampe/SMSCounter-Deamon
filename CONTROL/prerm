@@ -1,0 +1,7 @@
+#!/bin/sh
+
+/sbin/stop org.daslampe.smsCounterd
+
+rm -f /etc/event.d/org.daslampe.smsCounterd
+
+exit 0

@@ -1,0 +1,119 @@
+#!/bin/sh
+
+me="/usr/sbin/smsCounterd"
+tmpstatsfile="/tmp/smscounter.$$"
+delay="300"
+version="0.0.8"
+sql="/usr/bin/sqlite3"
+
+#For WebOs < 2.1.0
+database="/var/luna/data/dbdata/PalmDatabase.db3"
+
+loc_pref_cr="/var/palm/data/file_.media.cryptofs.apps.usr.palm.applications.org.daslampe.smscounter_0"
+loc_db_cr="/media/internal/.app-storage/org.daslampe.smscounter"
+loc_app_cr="/media/cryptofs/apps/usr/palm/applications/org.daslampe.smscounter"
+
+loc_pref_var="/var/palm/data/file_.var.usr.palm.applications.org.daslampe.smscounter_0"
+loc_db_var="/media/internal/.app-storage/org.daslampe.smscounter"
+loc_app_var="/var/usr/palm/applications/org.daslampe.smscounter"
+
+# !!!!!COPY FROM Netstat Version 1.0.16!!!!!!!
+findprefsdb () {
+    if ls $prefdir/*.db > /dev/null 2>&1; then
+	# not empty
+	prefdb=`ls $prefdir/*.db`
+	if test -z "$preflsl"; then
+	    # first seen, return the new value
+	    preflsl=`ls -l $prefdb`
+	    echo $prefdb
+	else
+	    # have already seen it
+	    newlsl=`ls -l $prefdb`
+	    if test "$newlsl" != "$preflsl"; then
+		# preferences value changed, fetch and update preflsl
+		preflsl="$newlsl"
+		echo $prefdb
+	    else
+		# nothing changed
+		:
+	    fi
+	fi
+    else
+	# no db so far
+	echo 'false'
+    fi
+}
+# ////END COPY FROM Netstat Version 1.0.16////
+
+if [ -d $loc_app_cr ]; then
+	prefdir=$loc_pref_cr
+	dbdir=$loc_db_cr
+else
+	if [ -d $loc_app_var ]; then
+		prefdir=$loc_pref_var
+		dbdir=$loc_db_var
+	else
+		#Error
+		echo "no db folder"
+		prefdir=$loc_pref_var
+		dbdir=$loc_db_var
+	fi
+fi
+
+if [ ! -d $dbdir ]; then
+	mkdir -p $dbdir;
+	if [ ! -d $dbdir ]; then
+		echo "can't create db folder"
+	fi
+fi
+
+#Find Database form App
+statfile="$dbdir/smscounter.json"
+localdb=`findprefsdb`
+
+while : ; do
+	#read start day
+	if [ ! $localdb == 'false' ]; then
+		startDayMonth=`$sql $localdb "SELECT p.value FROM properties AS p, toc AS t WHERE t.key = 'startday' AND t.id = p.frowid;"`
+	else
+		startDayMonth='1'
+
+	fi
+
+	#Hack for Timestamp
+	timeStampDay="`curl -s http://daslampe.lano-crew.org/webOs/hack/timestamp.php?day | awk '/<p>/{gsub(/<p>/, "");print $1}'`"
+	timeStampMonth="`curl -s http://daslampe.lano-crew.org/webOs/hack/timestamp.php?day=$startDayMonth | awk '/<p>/{gsub(/<p>/, "");print $1}'`"
+
+	if [ "`head -1 /etc/palm-build-info | sed "s/PRODUCT_VERSION_STRING=\(.*\)/\1/"`" == "HP webOS 2.1.0" ]; then
+	#WebOs = 2.1.0
+		countMonth=`luna-send -n 1 -a com.palm.app.messaging luna://com.palm.db/search '{"query": {"from":"com.palm.smsmessage:1","where":[{"prop":"timestamp","op":">=","val":'$timeStampMonth'},],"orderBy":"timestamp"}}' | awk '{while (sub(/\"folder\":\"outbox\"/,",")) t++}END{print t}'`
+		countDay=`luna-send -n 1 -a com.palm.app.messaging luna://com.palm.db/search '{"query": {"from":"com.palm.smsmessage:1","where":[{"prop":"timestamp","op":">=","val":'$timeStampDay'},],"orderBy":"timestamp"}}' | awk '{while (sub(/\"folder\":\"outbox\"/,",")) t++}END{print t}'`
+		countAll=`luna-send -n 1 -a com.palm.app.messaging luna://com.palm.db/search '{"query": {"from":"com.palm.smsmessage:1","where":[{"prop":"folder","op":"=","val":"outbox"},],"orderBy":"timestamp"}}' | sed -e "s/\(.*\)\"count\":\(.*\)}/\2/"`
+	else
+	#WebOS < 2.1.0
+		countDay=`$sql $database "SELECT COUNT(*) FROM com_palm_pim_FolderEntry WHERE deviceTimeStamp >= '$timeStampDay' AND flags = '133' AND messageType='SMS'"`
+		countMonth=`$sql $database "SELECT COUNT(*) FROM com_palm_pim_FolderEntry WHERE deviceTimeStamp >= '$timeStampMonth' AND flags = '133' AND messageType='SMS'"`
+		countAll=`$sql $database "SELECT COUNT(*) FROM com_palm_pim_FolderEntry WHERE flags = '133' AND messageType='SMS'"`
+	fi
+
+	#If no error in result	
+	if (([ $countDay -eq 0 ] || [ $countDay -gt 0 ]) && ([ $countMonth -eq 0 ] || [ $countMonth -gt 0 ]) && ([ $countAll -eq 0 ] || [ $countAll -gt 0 ])); then
+		lastUpdate=`date +'%H:%M:%S %m/%d/%Y'`
+			
+		echo "{"					> $tmpstatsfile
+		echo " \"countDay\" : \"$countDay\","		>> $tmpstatsfile
+		echo " \"countMonth\" : \"$countMonth\","	>> $tmpstatsfile
+		echo " \"countAll\" : \"$countAll\","		>> $tmpstatsfile
+		echo " \"lastUpdate\" : \"$lastUpdate\""	>> $tmpstatsfile
+		echo "}" 					>> $tmpstatsfile
+
+		cp $tmpstatsfile $statfile
+		echo "Update successful. Start Day:"$startDayMonth
+		sleep $delay
+		localdb=`findprefsdb`
+	else
+		#Error
+		echo "no values from db - crazy"
+	fi
+done
+# EOF$

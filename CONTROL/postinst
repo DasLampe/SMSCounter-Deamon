@@ -1,0 +1,10 @@
+#!/bin/sh
+if [ -z "$IPKG_OFFLINE_ROOT" ]; then
+    IPKG_OFFLINE_ROOT=/media/cryptofs/apps
+fi
+
+cp $IPKG_OFFLINE_ROOT/etc/event.d/org.daslampe.smsCounterd /etc/event.d/org.daslampe.smsCounterd
+
+/sbin/start org.daslampe.smsCounterd
+
+exit 0

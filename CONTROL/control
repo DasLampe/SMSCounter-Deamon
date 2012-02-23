@@ -1,0 +1,8 @@
+Package: org.daslampe.smscounterd
+Version: 0.0.8
+Maintainer: DasLampe <daslampe@lano-crew.org>
+Description: SMSCounter Daemon
+Architecture: all
+Priority: optional
+Section: Linux Daemon
+Source: { "Type" : "Linux Daemon", "Category" : "Message", "LastUpdated" : "1329082900", "Title" : "SMS Counter Daemon", "FullDescription" : "Daemon for the Palm Pre SMS Counter<hr>0.0.8: Now same savepath for all WebOS Versions<br/>0.0.7:Changed path for JSON file. Full support for WebOs 2.x<br/>0.0.6: Nun auch auf WebOs 2.x nutzbar<br/>0.0.5: Counter JSON Datei ist wieder an lesbarer stelle<br/>0.0.4: Error Handling + eingehen auf Telefon Architektur<br/>0.0.3: Starttag des Monats nun einstellbar<br/>0.0.1: initial commit version", "Homepage" : "http://daslampe.lano-crew.org/", "Icon" : "http://daslampe.lano-crew.org/webOs/smsCounter/icon.pn7", "License" : "BSD Open Source License" }

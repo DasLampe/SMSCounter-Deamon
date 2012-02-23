@@ -1,0 +1,25 @@
+# -*-sh-*-
+description "SMS Counter Daemon"
+
+start on stopped finish
+stop on runlevel [!2]
+
+console none
+
+# Make sure stats collector doesn't slow down GUI use
+nice 5
+
+# Restart the collector if it exits/dies
+respawn
+
+script
+    if grep -q /media/cryptofs/apps /etc/palm/luna.conf ; then
+	APPS=/media/cryptofs/apps
+    else
+	APPS=/var
+    fi
+    exec /bin/sh $APPS/usr/sbin/smsCounterd
+end script
+
+# end of file
+
